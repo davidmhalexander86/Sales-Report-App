@@ -1,0 +1,6 @@
+{
+  "name": "Verdant Sales Report Generator",
+  "description": "An intuitive, green-themed sales report generator that calculates total revenue, best-selling product, average sale amount, and exports polished executive summaries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

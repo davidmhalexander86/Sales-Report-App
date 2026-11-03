@@ -11,7 +11,7 @@ import { BOTANICAL_SAMPLE_SALES } from './data/sampleData';
 import { calculateReportSummary, generateCSV, formatCurrency } from './utils/salesCalculator';
 import { ArrowRight, Plus, FileSpreadsheet, BarChart3, ReceiptText } from 'lucide-react';
 
-const STORAGE_KEY = 'verdant_sales_data_v1';
+const STORAGE_KEY = 'verdant_sales_data_v2';
 
 export default function App() {
   const [sales, setSales] = useState<SaleItem[]>(() => {

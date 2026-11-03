@@ -25,6 +25,19 @@ export interface CategoryPerformance {
   percentageOfRevenue: number;
 }
 
+export interface MonthlyComparison {
+  currentMonthKey: string; // e.g. "2026-11"
+  previousMonthKey: string; // e.g. "2026-10"
+  currentMonthLabel: string; // e.g. "November 2026" or "Nov"
+  previousMonthLabel: string; // e.g. "October 2026" or "Oct"
+  currentMonthRevenue: number;
+  previousMonthRevenue: number;
+  percentageChange: number; // e.g. +14.8 or -8.2
+  absoluteChange: number; // current - prev
+  isGrowth: boolean;
+  hasPreviousMonthData: boolean;
+}
+
 export interface SalesReportSummary {
   totalRevenue: number;
   totalUnitsSold: number;
@@ -37,6 +50,7 @@ export interface SalesReportSummary {
   categories: CategoryPerformance[];
   maxSale: { product: string; amount: number; quantity: number } | null;
   minSale: { product: string; amount: number; quantity: number } | null;
+  monthlyComparison: MonthlyComparison | null;
   startDate: string;
   endDate: string;
 }

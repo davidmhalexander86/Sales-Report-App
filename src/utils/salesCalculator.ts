@@ -1,4 +1,88 @@
-import { SaleItem, SalesReportSummary, ProductPerformance, CategoryPerformance } from '../types/sales';
+import {
+  SaleItem,
+  SalesReportSummary,
+  ProductPerformance,
+  CategoryPerformance,
+  MonthlyComparison,
+} from '../types/sales';
+
+export function calculateMonthlyComparison(sales: SaleItem[]): MonthlyComparison | null {
+  if (!sales || sales.length === 0) return null;
+
+  // Group revenue by YYYY-MM
+  const monthMap = new Map<string, number>();
+
+  for (const item of sales) {
+    if (!item.date) continue;
+    const match = item.date.match(/^(\d{4})-(\d{2})/);
+    if (!match) continue;
+    const monthKey = `${match[1]}-${match[2]}`;
+    const cost = Math.max(0, Number(item.cost) || 0);
+    const qty = Math.max(0, Number(item.quantitySold) || 0);
+    monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + cost * qty);
+  }
+
+  const sortedMonths = Array.from(monthMap.keys()).sort();
+  if (sortedMonths.length === 0) return null;
+
+  // Latest month recorded
+  const currentMonthKey = sortedMonths[sortedMonths.length - 1];
+  const currentMonthRevenue = monthMap.get(currentMonthKey) || 0;
+
+  // Calculate the preceding calendar month
+  const [cYear, cMonth] = currentMonthKey.split('-').map(Number);
+  const prevDate = new Date(cYear, cMonth - 2, 1);
+  const prevYear = prevDate.getFullYear();
+  const prevMonthNum = String(prevDate.getMonth() + 1).padStart(2, '0');
+  const expectedPrevMonthKey = `${prevYear}-${prevMonthNum}`;
+
+  let previousMonthKey = expectedPrevMonthKey;
+  let hasPreviousMonthData = false;
+  let previousMonthRevenue = 0;
+
+  if (monthMap.has(expectedPrevMonthKey)) {
+    previousMonthRevenue = monthMap.get(expectedPrevMonthKey) || 0;
+    hasPreviousMonthData = true;
+  } else if (sortedMonths.length >= 2) {
+    // If consecutive months weren't found, compare with the immediately preceding available month
+    previousMonthKey = sortedMonths[sortedMonths.length - 2];
+    previousMonthRevenue = monthMap.get(previousMonthKey) || 0;
+    hasPreviousMonthData = true;
+  }
+
+  let percentageChange = 0;
+  if (hasPreviousMonthData) {
+    if (previousMonthRevenue > 0) {
+      percentageChange = ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
+    } else if (currentMonthRevenue > 0) {
+      percentageChange = 100;
+    }
+  }
+
+  const currentMonthLabel = new Date(cYear, cMonth - 1, 1).toLocaleDateString('en-US', {
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const [pYear, pMonth] = previousMonthKey.split('-').map(Number);
+  const previousMonthLabel = new Date(pYear, pMonth - 1, 1).toLocaleDateString('en-US', {
+    month: 'short',
+    year: 'numeric',
+  });
+
+  return {
+    currentMonthKey,
+    previousMonthKey,
+    currentMonthLabel,
+    previousMonthLabel,
+    currentMonthRevenue,
+    previousMonthRevenue,
+    percentageChange,
+    absoluteChange: currentMonthRevenue - previousMonthRevenue,
+    isGrowth: percentageChange >= 0,
+    hasPreviousMonthData,
+  };
+}
 
 export function calculateReportSummary(sales: SaleItem[]): SalesReportSummary {
   if (!sales || sales.length === 0) {
@@ -14,6 +98,7 @@ export function calculateReportSummary(sales: SaleItem[]): SalesReportSummary {
       categories: [],
       maxSale: null,
       minSale: null,
+      monthlyComparison: null,
       startDate: '',
       endDate: '',
     };
@@ -23,18 +108,24 @@ export function calculateReportSummary(sales: SaleItem[]): SalesReportSummary {
   let totalUnitsSold = 0;
 
   // Track product aggregates
-  const productMap = new Map<string, {
-    category: string;
-    totalQuantity: number;
-    totalRevenue: number;
-    transactionCount: number;
-  }>();
+  const productMap = new Map<
+    string,
+    {
+      category: string;
+      totalQuantity: number;
+      totalRevenue: number;
+      transactionCount: number;
+    }
+  >();
 
   // Track category aggregates
-  const categoryMap = new Map<string, {
-    totalRevenue: number;
-    totalQuantity: number;
-  }>();
+  const categoryMap = new Map<
+    string,
+    {
+      totalRevenue: number;
+      totalQuantity: number;
+    }
+  >();
 
   let maxSale: { product: string; amount: number; quantity: number } | null = null;
   let minSale: { product: string; amount: number; quantity: number } | null = null;
@@ -120,18 +211,22 @@ export function calculateReportSummary(sales: SaleItem[]): SalesReportSummary {
   products.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
   // Convert Category Map to sorted array
-  const categories: CategoryPerformance[] = Array.from(categoryMap.entries()).map(([category, data]) => {
-    return {
-      category,
-      totalRevenue: data.totalRevenue,
-      totalQuantity: data.totalQuantity,
-      percentageOfRevenue: totalRevenue > 0 ? (data.totalRevenue / totalRevenue) * 100 : 0,
-    };
-  }).sort((a, b) => b.totalRevenue - a.totalRevenue);
+  const categories: CategoryPerformance[] = Array.from(categoryMap.entries())
+    .map(([category, data]) => {
+      return {
+        category,
+        totalRevenue: data.totalRevenue,
+        totalQuantity: data.totalQuantity,
+        percentageOfRevenue: totalRevenue > 0 ? (data.totalRevenue / totalRevenue) * 100 : 0,
+      };
+    })
+    .sort((a, b) => b.totalRevenue - a.totalRevenue);
 
   validDates.sort();
   const startDate = validDates.length > 0 ? validDates[0] : '';
   const endDate = validDates.length > 0 ? validDates[validDates.length - 1] : '';
+
+  const monthlyComparison = calculateMonthlyComparison(sales);
 
   return {
     totalRevenue,
@@ -145,6 +240,7 @@ export function calculateReportSummary(sales: SaleItem[]): SalesReportSummary {
     categories,
     maxSale,
     minSale,
+    monthlyComparison,
     startDate,
     endDate,
   };
@@ -182,15 +278,11 @@ export function parseSalesText(rawText: string): SaleItem[] {
 
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i];
-    // Split by comma or tab, taking care of quoted values
     const cols = splitDelimitedLine(line);
     if (cols.length < 2) continue;
 
-    // Detect column roles:
-    // Standard expectation: Product, Cost/Price, Quantity Sold, [Category], [Date]
     const product = cols[0]?.trim() || `Item ${i + 1}`;
-    
-    // Find numbers for cost and quantity
+
     let cost = 0;
     let quantity = 1;
     let category = 'General';
@@ -210,7 +302,6 @@ export function parseSalesText(rawText: string): SaleItem[] {
     }
 
     if (numericCols.length >= 2) {
-      // First numeric usually cost/price, second quantity (or vice-versa if quantity is integer)
       cost = numericCols[0];
       quantity = numericCols[1];
     } else if (numericCols.length === 1) {
@@ -218,7 +309,6 @@ export function parseSalesText(rawText: string): SaleItem[] {
       quantity = 1;
     }
 
-    // Check for category or date in non-numerics
     for (const val of nonNumericCols) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
         date = val;
@@ -246,7 +336,6 @@ function splitDelimitedLine(line: string): string[] {
     return line.split('\t');
   }
 
-  // Handle standard CSV with quotes
   const result: string[] = [];
   let current = '';
   let inQuotes = false;
@@ -304,9 +393,16 @@ export function generateExecutiveNarrative(summary: SalesReportSummary): string 
     bestSellingByRevenue,
     categories,
     products,
+    monthlyComparison,
   } = summary;
 
   let narrative = `This sales cycle recorded a total gross revenue of ${formatCurrency(totalRevenue)} across ${formatNumber(totalTransactions)} transaction${totalTransactions > 1 ? 's' : ''}, representing ${formatNumber(totalUnitsSold)} total product units delivered. The average transaction value stood at ${formatCurrency(averageSaleAmount)}.`;
+
+  if (monthlyComparison && monthlyComparison.hasPreviousMonthData) {
+    const changeDirection = monthlyComparison.isGrowth ? 'growth' : 'decline';
+    const sign = monthlyComparison.isGrowth ? '+' : '';
+    narrative += ` Month-over-month performance showed a ${changeDirection} of ${sign}${formatPercent(monthlyComparison.percentageChange)} in ${monthlyComparison.currentMonthLabel} (${formatCurrency(monthlyComparison.currentMonthRevenue)}) compared to ${monthlyComparison.previousMonthLabel} (${formatCurrency(monthlyComparison.previousMonthRevenue)}).`;
+  }
 
   if (bestSellingByRevenue) {
     narrative += ` Top financial performance was led by "${bestSellingByRevenue.product}", generating ${formatCurrency(bestSellingByRevenue.totalRevenue)} (${formatPercent(bestSellingByRevenue.percentageOfRevenue)} of overall volume) with ${formatNumber(bestSellingByRevenue.totalQuantity)} units sold.`;

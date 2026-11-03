@@ -165,14 +165,34 @@ ${narrative}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Total Revenue */}
             <div className="p-4 rounded-lg border border-stone-200 bg-white">
-              <span className="text-xs text-stone-500 block mb-1">Total Revenue</span>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-xs text-stone-500 block">Total Revenue</span>
+                {summary.monthlyComparison && summary.monthlyComparison.hasPreviousMonthData && (
+                  <span
+                    className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded font-mono tabular-nums ${
+                      summary.monthlyComparison.isGrowth
+                        ? 'bg-emerald-50 text-emerald-800'
+                        : 'bg-rose-50 text-rose-800'
+                    }`}
+                  >
+                    {summary.monthlyComparison.isGrowth ? '+' : ''}
+                    {formatPercent(summary.monthlyComparison.percentageChange)} MoM
+                  </span>
+                )}
+              </div>
               <div className="text-2xl font-bold font-mono text-stone-900 tabular-nums">
                 {formatCurrency(summary.totalRevenue)}
               </div>
-              <div className="text-[11px] text-stone-500 mt-1 flex items-center gap-1.5">
+              <div className="text-[11px] text-stone-500 mt-1 flex items-center gap-1.5 flex-wrap">
                 <span>{summary.totalTransactions} transactions</span>
                 <span aria-hidden="true">·</span>
                 <span>{summary.totalUnitsSold} units</span>
+                {summary.monthlyComparison && summary.monthlyComparison.hasPreviousMonthData && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>vs {summary.monthlyComparison.previousMonthLabel}</span>
+                  </>
+                )}
               </div>
             </div>
 
